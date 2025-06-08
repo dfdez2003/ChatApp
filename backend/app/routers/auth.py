@@ -1,6 +1,6 @@
 from fastapi import APIRouter, HTTPException, Depends
 from schemas.usuario import UsuarioCreate, UsuarioLogin
-from services.usuario import crear_usuario, logiar_usuario
+from services.usuario import *
 from utils.auth import crear_token
 from utils.auth import get_current_user
 from fastapi.responses import HTMLResponse, FileResponse
@@ -24,7 +24,7 @@ async def login_page():
 @router.post("/register")
 async def register(usuario: UsuarioCreate):
     try:
-        nuevo_usuario = await crear_usuario(usuario)
+        nuevo_usuario = await crear_usuario2(usuario)
         return {"mensaje": "Usuario registrado", "usuario": nuevo_usuario}
     except Exception as e:
         raise HTTPException(status_code=400, detail=str(e))
