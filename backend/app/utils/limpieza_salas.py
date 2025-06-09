@@ -1,6 +1,9 @@
 import redis.asyncio as redis
 import asyncio
 import json
+from datetime import datetime
+from pymongo import DeleteOne
+
 
 r = redis.Redis()
 
@@ -40,3 +43,5 @@ async def tarea_limpieza_salas():
             print(f"❌ Error en limpieza de salas: {e}")
 
         await asyncio.sleep(60)  # Espera 60 segundos antes de repetir
+
+
