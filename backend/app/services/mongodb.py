@@ -19,6 +19,10 @@ def coleccionUsuarios():
     bd = conectarMDB()
     return bd["usuarios"]
 
+def coleccionSalas():
+    bd = conectarMDB()
+    return bd["salas"]
+
 conectarMDB()
 
 

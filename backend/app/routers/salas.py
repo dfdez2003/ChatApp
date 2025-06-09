@@ -4,7 +4,8 @@ from fastapi import APIRouter, Depends, HTTPException
 from schemas.sala import SalaCreate, ExpulsionData
 from fastapi.responses import HTMLResponse, FileResponse
 from services.sala import (
-    crear_sala, 
+    crear_sala,
+    crear_sala2, 
     unirse_a_sala, 
     mostrar_salas_propias, 
     mostrar_salas_random, 
@@ -48,7 +49,7 @@ async def crear_sala_endpoint(
     sala: SalaCreate,
     user = Depends(get_current_user)
 ):
-    return await crear_sala(sala, user["id"])
+    return await crear_sala2(sala, user["id"])
 
 
 # routers/salas.py
