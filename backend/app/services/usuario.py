@@ -7,6 +7,7 @@ from schemas.usuario import UsuarioOut
 import redis.asyncio as redis
 import logging
 from fastapi import HTTPException
+from bson.objectid import ObjectId
 from .mongodb import *
 
 logger = logging.getLogger(__name__)
@@ -149,6 +150,32 @@ async def logiar_usuario(data):  # data tiene: username, password
 
     raise Exception("Usuario o contraseña incorrectos")
 
+
+async def logiar_usuario2(data):  # data: username, password
+    usuarios_collection = coleccionUsuarios()
+
+    # 🔍 Buscar por username en MongoDB
+    usuario = await usuarios_collection.find_one({"username": data.username})
+    if not usuario:
+        raise Exception("Usuario o contraseña incorrectos")
+
+    # ✅ Verificar contraseña con hash
+    if not pwd_context.verify(data.password, usuario["password_hash"]):
+        raise Exception("Usuario o contraseña incorrectos")
+
+    print("\n[DEBUG] Datos del usuario desde MongoDB:", usuario)
+
+    usuario_out_data = {
+        "id": str(usuario["_id"]),
+        "nombre": usuario["nombre"],
+        "surname": usuario["surname"],
+        "username": usuario["username"],
+        "email": usuario["email"],
+        "fecha_registro": usuario["fecha_registro"],
+    }
+
+    print("[DEBUG] Objeto de salida:", usuario_out_data)
+    return UsuarioOut(**usuario_out_data)
 
 
 async def obtener_usuario_por_id(usuario_id: str) -> UsuarioOut:
