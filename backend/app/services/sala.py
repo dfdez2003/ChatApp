@@ -5,7 +5,7 @@ from datetime import datetime
 from passlib.context import CryptContext
 import redis.asyncio as redis
 from fastapi import HTTPException
-from .mongodb import coleccionSalas
+from .mongodb import coleccionSalas, coleccionUsuarios
 
 pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
 r = redis.Redis()
@@ -180,6 +180,41 @@ async def crear_sala2(data, creador_id: str):
 
 
 async def unirse_a_sala(data, user_id: str):
+    salas_collection = coleccionSalas()       # 🔧 definida en mongodb.py
+    usuarios_collection = coleccionUsuarios() # 🔧 también en mongodb.py
+    print("DEBUG RANDOM UNIRSE A SALAS")
+    # Buscar la sala en MongoDB
+    sala = await salas_collection.find_one({"_id": data.sala_id})
+    if not sala:
+        raise HTTPException(status_code=404, detail="La sala no existe")
+
+    # Validar contraseña si es privada
+    if sala.get("es_publica") == "0":
+        if not data.password:
+            raise HTTPException(status_code=403, detail="Se requiere contraseña")
+        if not pwd_context.verify(data.password, sala.get("password_hash", "")):
+            raise HTTPException(status_code=403, detail="Contraseña incorrecta")
+
+    # Verificar si el usuario ya está en la sala
+    if user_id in sala.get("usuarios", []):
+        return {"mensaje": "Ya estás en la sala"}
+
+    # Añadir usuario a la sala
+    await salas_collection.update_one(
+        {"_id": data.sala_id},
+        {"$addToSet": {"usuarios": user_id}}
+    )
+
+    # Opcional: añadir la sala al usuario si mantienes esa relación también
+    await usuarios_collection.update_one(
+        {"_id": user_id},
+        {"$addToSet": {"salas": data.sala_id}}
+    )
+
+    return {"mensaje": "Te uniste a la sala", "sala_id": data.sala_id}
+
+
+async def unirse_a_sala2(data, user_id: str):
     sala_key = f"sala:{data.sala_id}"
 
     if not await r.exists(sala_key):
@@ -269,7 +304,7 @@ async def mostrar_salas_propias(user_id: str):
     return {"salas": salas}
 
 #  Mostrar salas públicas aleatorias (sin riesgo de corrupción)
-async def mostrar_salas_random(user_id: str):
+async def mostrar_salas_random1(user_id: str):
     salas = []
     async for k in r.scan_iter(match="sala:*"):
         if b":" in k and b"usuarios" not in k and b"mensajes" not in k:
@@ -286,6 +321,33 @@ async def mostrar_salas_random(user_id: str):
                 salas.append(sala)
     salas.sort(key=lambda x: x.get("fecha_creacion", ""), reverse=True)
     return {"salas": salas}
+
+async def mostrar_salas_random(user_id: str):
+    salas_collection = coleccionSalas()  # Asegúrate de tener esto definido en mongodb.py
+
+    # Consulta todas las salas (puedes filtrar por públicas si lo deseas)
+    cursor = salas_collection.find({})  # Usa {"es_publica": "1"} si quieres solo públicas
+
+    salas = []
+    async for sala in cursor:
+        # Convertimos el ObjectId a string
+        sala["id"] = str(sala["_id"])
+
+        # Opcional: calcula el tiempo restante si usas expiración (TTL) manualmente
+        # Aquí asumimos que tienes un campo "expira_en" tipo datetime
+        if "expira_en" in sala:
+            tiempo_restante = (sala["expira_en"] - datetime.utcnow()).total_seconds()
+            sala["tiempo_restante"] = int(tiempo_restante) if tiempo_restante > 0 else None
+        else:
+            sala["tiempo_restante"] = None
+
+        salas.append(sala)
+
+    # Ordenar por fecha de creación descendente
+    salas.sort(key=lambda x: x.get("fecha_creacion", ""), reverse=True)
+
+    return {"salas": salas}
+
 
 async def obtener_usuario(user_id: str):
     """
