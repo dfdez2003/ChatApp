@@ -7,6 +7,7 @@ from schemas.usuario import UsuarioOut
 import redis.asyncio as redis
 import logging
 from fastapi import HTTPException
+from .mongodb import *
 
 logger = logging.getLogger(__name__)
 
@@ -56,7 +57,69 @@ async def crear_usuario(data):
         "fecha_registro": fecha
     }
 
-    
+async def crear_usuario2(data):
+    # 🔍 Verificar que no exista ya en Redis
+    async for key in r.scan_iter(match="usuario:*"):
+        tipo = await r.type(key)
+        if tipo != b"hash":
+            continue
+        email = await r.hget(key, "email")
+        if email and email.decode() == data.email:
+            raise Exception("Correo ya registrado")
+
+    usuario_id = str(uuid.uuid4())
+    fecha = datetime.utcnow().isoformat()
+    hashed = hash_password(data.password)
+
+    mongo_doc = {
+        "_id": usuario_id,
+        "nombre": data.nombre,
+        "surname": data.surname,
+        "username": data.username,
+        "email": data.email,
+        "password_hash": hashed,
+        "fecha_registro": fecha
+    }
+
+    usuarios_collection = coleccionUsuarios()
+    usuario_hash_key = f"usuario:{usuario_id}"
+
+    try:
+        # ✅ Insertar en MongoDB
+        await usuarios_collection.insert_one(mongo_doc)
+        print("[DEBUG] Insertado en MongoDB")
+
+        # ✅ Insertar en Redis
+        await r.hset(usuario_hash_key, mapping=mongo_doc)
+        print("[DEBUG] Insertado en Redis")
+
+        return {
+            "id": usuario_id,
+            "nombre": data.nombre,
+            "email": data.email,
+            "fecha_registro": fecha
+        }
+
+    except Exception as e:
+        print(f"[ERROR] Falló alguna inserción: {e}")
+
+        # ⛔ Rollback MongoDB si ya se insertó
+        try:
+            await usuarios_collection.delete_one({"_id": usuario_id})
+            print("[DEBUG] Rollback en MongoDB exitoso")
+        except Exception as rollback_mongo_error:
+            print(f"[ERROR] Falló rollback MongoDB: {rollback_mongo_error}")
+
+        # ⛔ Rollback Redis si ya se insertó
+        try:
+            await r.delete(usuario_hash_key)
+            print("[DEBUG] Rollback en Redis exitoso")
+        except Exception as rollback_redis_error:
+            print(f"[ERROR] Falló rollback Redis: {rollback_redis_error}")
+
+        raise Exception("No se pudo crear el usuario completamente")
+
+
 async def logiar_usuario(data):  # data tiene: username, password
     async for key in r.scan_iter(match="usuario:*"):
         tipo = await r.type(key)
