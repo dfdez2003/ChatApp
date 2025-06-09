@@ -5,6 +5,7 @@ from datetime import datetime
 from passlib.context import CryptContext
 import redis.asyncio as redis
 from fastapi import HTTPException
+from .mongodb import coleccionSalas
 
 pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
 r = redis.Redis()
@@ -107,6 +108,76 @@ async def crear_sala(data, creador_id: str):
         "fecha_creacion": fecha,
         "es_publica": data.es_publica
     }
+
+async def crear_sala2(data, creador_id: str):
+    # 🆔 Generar ID único
+    sala_id = str(uuid.uuid4())
+    fecha = datetime.utcnow().isoformat()
+    password_hash = pwd_context.hash(data.password) if data.password else ""
+    es_publica = not bool(password_hash)
+
+    # 📄 Documento MongoDB
+    mongo_doc = {
+        "_id": sala_id,
+        "nombre": data.nombre,
+        "descripcion": data.descripcion or "",
+        "tiempo_vida": int(data.tiempo_vida) if data.tiempo_vida else 0,
+        "creador_id": creador_id,
+        "es_publica": es_publica,
+        "password_hash": password_hash,
+        "fecha_creacion": fecha
+    }
+
+    # 🧠 Insertar en MongoDB
+    try:
+        salas_collection = coleccionSalas()  # asegúrate de tener esta función
+        await salas_collection.insert_one(mongo_doc)
+        print("[DEBUG] Sala insertada en MongoDB")
+    except Exception as e:
+        print(f"[ERROR] No se pudo insertar la sala en MongoDB: {e}")
+        raise Exception("Error al guardar sala")
+
+    # 🔐 Llaves Redis
+    sala_hash_key = f"sala:{sala_id}"
+    sala_usuarios_key = f"sala:{sala_id}:usuarios"
+    usuario_salas_key = f"usuario:{creador_id}:salas"
+    usuario_key = f"usuario:{creador_id}"
+
+    # 🧠 Insertar en Redis (solo si Mongo fue exitoso)
+    try:
+        await r.hset(sala_hash_key, mapping={
+            "nombre": data.nombre,
+            "descripcion": data.descripcion or "",
+            "tiempo_vida": str(data.tiempo_vida) if data.tiempo_vida else "0",
+            "creador_id": creador_id,
+            "es_publica": "1" if es_publica else "0",
+            "password_hash": password_hash,
+            "fecha_creacion": fecha,
+        })
+
+        await r.sadd(usuario_salas_key, sala_hash_key)
+        await r.sadd(sala_usuarios_key, usuario_key)
+
+        # ⏳ TTL
+        segundos = (int(data.tiempo_vida) if data.tiempo_vida else 2) * 3600
+        await r.expire(sala_hash_key, segundos)
+        await r.expire(sala_usuarios_key, segundos)
+        await r.expire(f"sala:{sala_id}:mensajes", segundos)
+        print(f"[DEBUG] TTL aplicado: {segundos}s")
+    except Exception as e:
+        # ⚠️ Revertir MongoDB si Redis falla
+        await salas_collection.delete_one({"_id": sala_id})
+        print(f"[ERROR] Redis falló, sala revertida de MongoDB: {e}")
+        raise Exception("Error al guardar sala en Redis")
+
+    return {
+        "id": sala_id,
+        "nombre": data.nombre,
+        "creador_id": creador_id,
+        "fecha_creacion": fecha,
+        "es_publica": es_publica
+    }
+
 
 async def unirse_a_sala(data, user_id: str):
     sala_key = f"sala:{data.sala_id}"
