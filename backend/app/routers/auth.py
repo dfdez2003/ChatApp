@@ -20,7 +20,6 @@ async def login_page():
     return "static/login.html"
 
 
-
 @router.post("/register")
 async def register(usuario: UsuarioCreate):
     try:
@@ -51,9 +50,6 @@ async def login(data: UsuarioLogin):
         "token_type": "bearer",
         "usuario": usuario.model_dump()  # Pydantic v2 | usa .dict() si estás en v1
     }
-
-
-
 
 @router.get("/me")
 def quien_soy(user = Depends(get_current_user)):

@@ -22,6 +22,10 @@ app.mount("/static", StaticFiles(directory="static",html=True), name="static")
 async def redirect_login():
     return RedirectResponse(url="/auth/login")
 
+@app.get("/")
+async def redirect_register():
+    return RedirectResponse(url="/auth/register")
+
 @app.get("/register")
 async def redirect_login():
     return RedirectResponse(url="/auth/register")
