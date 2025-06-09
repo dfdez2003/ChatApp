@@ -56,6 +56,7 @@ async def guardar_mensaje(data: MensajeIn, usuario_id: str) -> MensajeOut:
     print(f"[DEBUG] Mensaje :{mensaje}")
     mensajes_collection = coleccionMensajes()  # 🔧 Asegúrate de definir esta función
 
+    
     # Primero guardar en MongoDB
     try:
         await mensajes_collection.insert_one(mensaje)
@@ -63,7 +64,7 @@ async def guardar_mensaje(data: MensajeIn, usuario_id: str) -> MensajeOut:
     except Exception as e:
         print(f"[ERROR] No se pudo guardar mensaje en MongoDB: {e}")
         raise Exception("Error al guardar el mensaje")
-
+    '''
     # Guardar también en Redis (solo si Mongo fue exitoso)
     clave = f"sala:{data.sala_id}:mensajes"
 
@@ -87,6 +88,8 @@ async def guardar_mensaje(data: MensajeIn, usuario_id: str) -> MensajeOut:
         await mensajes_collection.delete_one({"_id": mensaje_id})
         print(f"[ERROR] Redis falló. Mensaje revertido en MongoDB: {e}")
         raise Exception("Error al guardar el mensaje en Redis")
+    ***/
+    '''
 
     return MensajeOut(
         id=mensaje_id,
@@ -120,6 +123,25 @@ async def obtener_mensajes(sala_id: str, limite: int = 50) -> list[MensajeOut]:
             continue
 
     return mensajes
+
+async def obtener_mensajes2(sala_id: str, limite: int = 50) -> list[MensajeOut]:
+    mensajes_collection = coleccionMensajes()  # 🔧 Asegúrate de tener esta función
+
+    try:
+        cursor = mensajes_collection.find(
+            {"sala_id": sala_id},
+            sort=[("fecha", 1)],  # orden ascendente: más antiguos primero
+            limit=limite
+        )
+        mensajes = []
+        async for doc in cursor:
+            doc["id"] = doc.pop("_id")  # Mongo guarda el ID como "_id"
+            mensajes.append(MensajeOut(**doc))
+        return mensajes
+    except Exception as e:
+        print(f"[ERROR] No se pudieron obtener los mensajes de MongoDB: {e}")
+        return []
+
 
 
 ## ------------------- Funciones no adaptadas aun para list

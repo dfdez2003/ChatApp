@@ -2,7 +2,7 @@
 
 from fastapi import APIRouter, Depends, HTTPException
 from schemas.mensaje import MensajeIn, MensajeEdit, MensajeDelete, MensajeOut
-from services.mensaje import guardar_mensaje,guardar_mensaje1, obtener_mensajes, editar_mensaje, eliminar_mensaje
+from services.mensaje import guardar_mensaje,guardar_mensaje1, obtener_mensajes,obtener_mensajes2, editar_mensaje, eliminar_mensaje
 from utils.auth import get_current_user
 from typing import List
 
@@ -18,7 +18,7 @@ async def enviar_mensaje(data: MensajeIn, user = Depends(get_current_user)):
 @router.get("/{sala_id}", response_model=List[MensajeOut])
 async def listar_mensajes(sala_id: str):
     try:
-        return await obtener_mensajes(sala_id)
+        return await obtener_mensajes2(sala_id)
     except Exception as e:
         raise HTTPException(status_code=400, detail=str(e))
 
