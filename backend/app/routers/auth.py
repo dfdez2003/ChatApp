@@ -42,7 +42,7 @@ async def get_register_page():
 
 @router.post("/login")
 async def login(data: UsuarioLogin):
-    usuario = await logiar_usuario(data)
+    usuario = await logiar_usuario2(data)
     token = crear_token({"user_id": usuario.id})
     print(f"Token: {token} Usuario:{usuario}")
     return {
