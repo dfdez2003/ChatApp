@@ -2,7 +2,7 @@
 
 from fastapi import APIRouter, Depends, HTTPException
 from schemas.mensaje import MensajeIn, MensajeEdit, MensajeDelete, MensajeOut
-from services.mensaje import guardar_mensaje, obtener_mensajes, editar_mensaje, eliminar_mensaje
+from services.mensaje import guardar_mensaje,guardar_mensaje1, obtener_mensajes, editar_mensaje, eliminar_mensaje
 from utils.auth import get_current_user
 from typing import List
 

@@ -23,6 +23,10 @@ def coleccionSalas():
     bd = conectarMDB()
     return bd["salas"]
 
+def coleccionMensajes():
+    bd = conectarMDB()
+    return bd["mensajes"]
+
 conectarMDB()
 
 
